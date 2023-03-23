@@ -20,7 +20,7 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2019.2
+set scripts_vivado_version 2020.2
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
@@ -1009,7 +1009,7 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net SkyNet_m_axi_bm [get_bd_intf_pins SkyNet/m_axi_bm] [get_bd_intf_pins smartconnect_2/S00_AXI]
   connect_bd_intf_net -intf_net SkyNet_m_axi_fm [get_bd_intf_pins SkyNet/m_axi_fm] [get_bd_intf_pins smartconnect_0/S00_AXI]
   connect_bd_intf_net -intf_net SkyNet_m_axi_wt [get_bd_intf_pins SkyNet/m_axi_wt] [get_bd_intf_pins smartconnect_1/S00_AXI]
-  connect_bd_intf_net -intf_net SkyNet_connect_M00_AXI [get_bd_intf_pins SkyNet/s_axi_AXILiteS] [get_bd_intf_pins SkyNet_connect/M00_AXI]
+  connect_bd_intf_net -intf_net SkyNet_connect_M00_AXI [get_bd_intf_pins SkyNet/s_axi_control] [get_bd_intf_pins SkyNet_connect/M00_AXI]
   connect_bd_intf_net -intf_net ps_e_M_AXI_HPM1_FPD [get_bd_intf_pins SkyNet_connect/S00_AXI] [get_bd_intf_pins ps_e/M_AXI_HPM1_FPD]
   connect_bd_intf_net -intf_net smartconnect_0_M00_AXI [get_bd_intf_pins ps_e/S_AXI_HP1_FPD] [get_bd_intf_pins smartconnect_0/M00_AXI]
   connect_bd_intf_net -intf_net smartconnect_1_M00_AXI [get_bd_intf_pins ps_e/S_AXI_HP0_FPD] [get_bd_intf_pins smartconnect_1/M00_AXI]
@@ -1027,7 +1027,7 @@ proc create_root_design { parentCell } {
   assign_bd_address -offset 0x00000000 -range 0x80000000 -target_address_space [get_bd_addr_spaces SkyNet/Data_m_axi_wt] [get_bd_addr_segs ps_e/SAXIGP2/HP0_DDR_LOW] -force
   assign_bd_address -offset 0x00000000 -range 0x80000000 -target_address_space [get_bd_addr_spaces SkyNet/Data_m_axi_fm] [get_bd_addr_segs ps_e/SAXIGP3/HP1_DDR_LOW] -force
   assign_bd_address -offset 0x00000000 -range 0x80000000 -target_address_space [get_bd_addr_spaces SkyNet/Data_m_axi_bm] [get_bd_addr_segs ps_e/SAXIGP5/HP3_DDR_LOW] -force
-  assign_bd_address -offset 0xB0000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps_e/Data] [get_bd_addr_segs SkyNet/s_axi_AXILiteS/Reg] -force
+  assign_bd_address -offset 0xB0000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces ps_e/Data] [get_bd_addr_segs SkyNet/s_axi_control/Reg] -force
 
   # Exclude Address Segments
   exclude_bd_addr_seg -offset 0xFF000000 -range 0x01000000 -target_address_space [get_bd_addr_spaces SkyNet/Data_m_axi_bm] [get_bd_addr_segs ps_e/SAXIGP5/HP3_LPS_OCM]
