@@ -295,11 +295,11 @@ void ACTIVATION(RDT IFM[32][43][83], ADT OFM[32][43][83], BDT BBUF[32], MDT MBUF
         for (int w = 1; w < 82; w++)
         {
 #pragma HLS PIPELINE
-            for (int c = 0; c < 32; c++)
+            for (int c = 0; c < 32; c++)    // 在最内层的维度展开，并行度是32，latenc 约为 82 * 42
             {
-                ap_int<20> qy = IFM[c][h][w] + BBUF[c];
+                ap_int<20> qy = IFM[c][h][w] + BBUF[c];  // 添加 bias
 
-                if (qy < 0)
+                if (qy < 0)         // ReLU
                 {
                     qy = 0;
                 }
@@ -308,7 +308,7 @@ void ACTIVATION(RDT IFM[32][43][83], ADT OFM[32][43][83], BDT BBUF[32], MDT MBUF
 
                 OFM[c][h][w] = qy < amin ? ADT(amin) : qy > amax ? ADT(amax) : ADT(qy);
 
-                IFM[c][h][w] = 0;                
+                IFM[c][h][w] = 0;   // 无法 dataflow，改用Loop Merge(融合两个loop)的方式，使得缓存 buf 清零
             }
         }
     }
@@ -399,7 +399,7 @@ void POOL(ADT32* fm, ADT IFM[32][43][83], int Hx, int Wx, int Cx, int ow, int oh
     {
         for (int w=1; w<=40; w++)
         {
-#pragma HLS PIPELINE II=4
+#pragma HLS PIPELINE II=4       // II = 4, Latency 约为 80*40. TODO: WHY SET II = 4?
             int fm_index = Cx*(oh*2+3)*(ow*2+3) + (h+h_o)*(ow*2+3) + (w+w_o);
             ADT32 DATA;
             for (int c=0; c<32; c++)
@@ -904,11 +904,11 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
             Load_FM1(fm + conv11_o, FM1, 0);
             for(int Nx=0; Nx<40; Nx++)
             {
-                Load_WBUF1x1(weight + conv12_w, WBUF1x1[0], Mx, Nx, config[17].ic);
+                Load_WBUF1x1(weight + conv12_w, WBUF1x1[0], Mx, Nx, config[17].ic); // 读取权重
                 if(Nx%2==0)
                 {
-                    Load_FM1(fm + conv11_o, FM2, Nx+1);
-                    PWCONV1X1(FM1, FM4, WBUF1x1[0]);
+                    Load_FM1(fm + conv11_o, FM2, Nx+1);     // 读取特征图
+                    PWCONV1X1(FM1, FM4, WBUF1x1[0]);        // 卷积计算
                 }
                 else
                 {
@@ -917,7 +917,7 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
                 }
             }
             Load_BBUF(biasm + conv12_b, BBUF[0], Mx);
-            Load_BBUF(biasm + conv12_m, MBUF[0], Mx);
+            Load_BBUF(biasm + conv12_m, MBUF[0], Mx);       // 激活
             ACTIVATION(FM4, FM3, BBUF[0], MBUF[0]);
             Export_FM1(fm + conv12_o, FM3, Mx);
         }

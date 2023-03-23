@@ -103,7 +103,7 @@ def compute_bounding_box(bbox, bbox_origin, batch, result):
 xlnk = Xlnk()
 xlnk.xlnk_reset()
 
-img   = xlnk.cma_array(shape=[4,160,320,4], dtype=np.uint8)
+img   = xlnk.cma_array(shape=[4,160,320,4], dtype=np.uint8)     # 相当于分配连续地址的 malloc
 fm= xlnk.cma_array(shape=(628115*32), dtype=np.uint8)
 weight = xlnk.cma_array(shape=(220672),  dtype=np.int16)
 biasm  = xlnk.cma_array(shape=(432*16),  dtype=np.int16)
@@ -118,7 +118,7 @@ overlay = Overlay("SkyNet.bit")
 print("Bitstream loaded")
 
 SkyNet = overlay.SkyNet
-SkyNet.write(0x10, img.physical_address)
+SkyNet.write(0x10, img.physical_address)    # 把物理地址写入加速器的地址
 SkyNet.write(0x1c, fm.physical_address)
 SkyNet.write(0x28, weight.physical_address)
 SkyNet.write(0x34, biasm.physical_address)
