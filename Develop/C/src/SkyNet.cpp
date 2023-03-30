@@ -22,15 +22,16 @@ static layer config[layer_count] = {
 { "conv13",40,20,96,   40,20,32,   1,1,0 },  //conv13
 };
 
+// 存储格式：CHW
 ADT FM1[32][43][83];
 ADT FM2[32][43][83];
 ADT FM3[32][43][83];
 RDT FM4[32][43][83];
 
-WDT WBUF3x3[3][32][3][3];
-WDT WBUF1x1[2][32][32];
-BDT BBUF[3][32];
-MDT MBUF[3][32];
+WDT WBUF3x3[3][32][3][3];   // 缓存DW-Conv3权重 
+WDT WBUF1x1[2][32][32];     // 缓存PW-Conv1权重，两个32*32
+BDT BBUF[3][32];            // 缓存偏置,每行分别存储DWconv3*3，两个PWconv1*1的系数
+MDT MBUF[3][32];            // 缓存量化系数,每行分别存储DWconv3*3，两个PWconv1*1的系数
 
 void REORG(ADT32 *ifm, ADT IFM[32][43][83], int Cx, ap_uint<3> Rx)
 {
@@ -314,6 +315,10 @@ void ACTIVATION(RDT IFM[32][43][83], ADT OFM[32][43][83], BDT BBUF[32], MDT MBUF
     }
 }
 
+/* 
+    Mx=0时，加载DWCONV权重；
+    TODO: How about Mx=others?
+ */
 void Load_WBUF3x3(WDT32* weight, WDT WBUF3x3[32][3][3], int Mx)
 {
     for(int m=0; m<3; m++)
@@ -322,9 +327,14 @@ void Load_WBUF3x3(WDT32* weight, WDT WBUF3x3[32][3][3], int Mx)
         {
 #pragma HLS PIPELINE II=1
             WDT32 DATA;
+            /* Mx=0时，
+               每次循环，DATA分别存储wight[0]到weight[8]，对应于DWCONV权重
+               每个weight[Mx*9+m*3+n]放置同一点的，32个不同channel的8bit权重
+            */
             DATA = weight[Mx*9+m*3+n];
             for(int c=0; c<32; c++)
             {
+                /* FIXME: ap_int<6>存储8bit数据，精度损失？ */
                 WBUF3x3[c][m][n] = DATA.range(8*c+7,8*c);
             }
         }
@@ -345,6 +355,12 @@ void Load_WBUF1x1(WDT32* weight, WDT WBUF1x1[32][32], int Mx, int Nx, int ic)
     }
 }
 
+/* 
+    加载偏置
+    Mx=0读入bias[0:1]到BBUF[32]内，
+    Mx=1读入bias[2:3]到BBUF[32]内；
+    MBUF同理
+ */
 void Load_BBUF(BDT16* bias, BDT BBUF[32], int Mx)
 {
     for(int i=0; i<2; i++)
@@ -577,6 +593,13 @@ void Compute_BBOX(RDT OFM[32][43][83], BDT MBUF[32], BDT16 BBOX[4])
     }
 }
 
+/* 
+    将img中的数据[img1->img2->img3](CHW)加载到IFM中
+    同时完成padding=1的操作
+    FIXME: 
+    (1)IFM的c为32，但是循环只加载了[0:3]？
+    (2)IFM的循环只有w的[0:81]共82，h的[0:42]共41，为什么开内存都多开了1？
+ */
 void Load_IMG(ADT4* img, ADT IFM[32][43][83], int Hx, int Wx, int b)
 {
     int h_o = Hx*40-1;
@@ -617,11 +640,16 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
 #pragma HLS ALLOCATION instances=Export_FM1   limit=1 function
 
     /*********************************DWCONV1+PWCONV1********************************/
+    /* (CHW) 32*160*320 -> 64*160*320 */
     std::cout << "DWCONV1+PWCONV1" << std::endl;
-    Load_WBUF3x3(weight + conv1_w, WBUF3x3[0], 0);
-    Load_BBUF(biasm + conv1_b, BBUF[0], 0);
-    Load_BBUF(biasm + conv1_m, MBUF[0], 0);
+    Load_WBUF3x3(weight + conv1_w, WBUF3x3[0], 0);  // DWCONV1的权重
+    Load_BBUF(biasm + conv1_b, BBUF[0], 0);         // DWCONV1的偏置
+    Load_BBUF(biasm + conv1_m, MBUF[0], 0);         // DWCONV1的量化系数
 
+    /* TODO: 拆分存储PWCONV权重？64个channel分别交给WBUF1x1[0]和[1]存储？ 
+       相当于用WBUF1x1[2][32][32]等效WBUF1x1[64][32]？
+       TODO: BBUF和MBUF同理？
+    */
     Load_WBUF1x1(weight + conv2_w, WBUF1x1[0], 0, 0, config[2].ic);
     Load_WBUF1x1(weight + conv2_w, WBUF1x1[1], 1, 0, config[2].ic);
     Load_BBUF(biasm + conv2_b, BBUF[1], 0);
@@ -633,16 +661,17 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
         for(int b=0; b<4; b++)
         {
             int H, W;
-            switch(b)
+            switch(b) // b 表示 第几张图
             {
                 case 0: H=0; W=0; break;
                 case 1: H=0; W=4; break;
                 case 2: H=4; W=0; break;
                 case 3: H=4; W=4; break;
             }
+            /* 图像160*320，FM[43][83]，tiling为4*4 */
             for(int Hx=0; Hx<4; Hx++)
             {
-                Load_IMG(img, FM1, Hx, 0, b);
+                Load_IMG(img, FM1, Hx, 0, b);   // 编号为1的feature map
                 for(int Wx=0; Wx<4; Wx++)
                 {
                     if(Wx%2==0)
@@ -769,6 +798,7 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
     /*********************************DWCONV4+PWCONV4********************************/
     std::cout << "DWCONV4+PWCONV4" << std::endl;
     {
+        /* DWconv，6次循环，完成32*6=192个channel的计算 */
         for(int Nx=0; Nx<6; Nx++)
         {
             Load_WBUF3x3(weight + conv7_w, WBUF3x3[0], Nx);
@@ -784,6 +814,7 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
     }
 
     {
+        /* PWconv，12次循环，完成32*12=384个channel的计算 */
         for(int Mx=0; Mx<12; Mx++)
         {
             Load_BBUF(biasm + conv8_b, BBUF[0], Mx);
@@ -813,6 +844,7 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
     std::cout << "DWCONV5+PWCONV5" << std::endl;
     {
         Load_FM1(fm + conv8_o, FM1, 0);
+        /* DWconv，12次循环，完成32*12=384个channel的计算 */
         for(int Nx=0; Nx<12; Nx++)
         {
             Load_WBUF3x3(weight + conv9_w, WBUF3x3[0], Nx);
@@ -833,6 +865,7 @@ void SkyNet(ADT4* img, ADT32* fm, WDT32* weight, BDT16* biasm)
         }
     }
     {
+        /* PWconv，16次循环，完成32*16=512个channel的计算 */
         for(int Mx=0; Mx<16; Mx++)
         {
             Load_BBUF(biasm + conv10_b, BBUF[0], Mx);

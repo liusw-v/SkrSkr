@@ -50,15 +50,15 @@ typedef ap_int<256> MDT16;
 #define nw 6
 #define nb 16
 #define nm 17
-#define qm 131072.0
+#define qm 131072.0		// 量化相关参数
 typedef int DT;
 
-#define amin 0
-#define amax 255
-#define bmin -32768
-#define bmax 32767
-#define rmax 262143
-#define rmin -262144
+#define amin 0			// 0 <= a <= 2^8-1
+#define amax 255		// 2^8-1, 0 <= a <= 2^8-1
+#define bmin -32768		// 2^15, -2^15 <= b <= 2^15
+#define bmax 32767		// 2^15-1, -2^15 <= b <= 2^15
+#define rmax 262143		// 2^18-1, -2^18 <= r <= 2^18
+#define rmin -262144	// -2^18, -2^18 <= r <= 2^18
 
 #define layer_count 19
 #define check_scale 0.00001

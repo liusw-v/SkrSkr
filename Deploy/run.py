@@ -110,7 +110,7 @@ biasm  = xlnk.cma_array(shape=(432*16),  dtype=np.int16)
 print("Allocating memory done")
 
 parameter = np.fromfile("SkyNet.bin", dtype=np.int16)
-np.copyto(weight, parameter[0:220672])
+np.copyto(weight, parameter[0:220672])      # 从numpy数组复制到加速器内存
 np.copyto(biasm[0:428*16], parameter[220672:])
 print("Parameters loading done")
 
@@ -163,11 +163,12 @@ with recorder.record(0.05):
         if (0 < idx <= IMAGE_NAMES_LEN - 1):
             compute_bounding_box(bbox ,bbox_origin.reshape(4,16), batch_buff, result)
 
+        # 控制加速器启动or停止
         isready = SkyNet.read(0x00)
         while( isready == 1 ):
             isready = SkyNet.read(0x00)
 
-        np.copyto(bbox_origin, biasm[428*16:])
+        np.copyto(bbox_origin, biasm[428*16:])      # 从加速器内存复制到numpy数组
         batch_buff = batch
 
         if (idx == IMAGE_NAMES_LEN - 1):

@@ -29,6 +29,7 @@ void stitch(ADT* ifm[4], ADT* ofm, layer l)
     }
 }
 
+/* 图片拼接 */
 void distitch(ADT* ifm, ADT* ofm[4], layer l)
 {   
     int offset_h[4];
@@ -70,6 +71,7 @@ void fm_DT_2_DT32(ADT* in, ADT32* out, layer l)
 	}
 }
 
+/* HWC -> CHW , layer变量未使用*/
 void img_DT_2_DT4(ADT* in, ADT4* out, layer l, int b)
 {
 	for (int i=0; i<160*320; i++)

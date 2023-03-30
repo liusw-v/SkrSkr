@@ -111,19 +111,21 @@ int main() {
 		ofm[p] = (ADT*)sds_alloc(64*320*640*sizeof(ADT));
 	}
 	img = (ADT4*)sds_alloc(4*160*320*sizeof(ADT4));
-	weight = (WDT32*)sds_alloc(441344*sizeof(WDT));
+	weight = (WDT32*)sds_alloc(441344*sizeof(WDT));		// (权重)参数量 441344
 	biasm = (BDT16*)sds_alloc(432*sizeof(BDT16));
 	ofm_blob32 = (ADT32*)sds_alloc(32*fm_all*sizeof(ADT));
 	ofm_blob = (ADT*)sds_alloc(64*643*323*sizeof(ADT));
 	//*************************************load data *********************************
 	printf("load parameter\n");
-	load_weight(weight, 441344);
-	load_biasm(biasm, 6848);
+	load_weight(weight, 441344);		// (权重)参数量，441344
+	load_biasm(biasm, 6848);			// 偏置参数量，6848
 
 	printf("load image\n");
 	for (int b = 0; b<4; b++)
 	{
+		// 读取 (WHC)320*160*4*(8bit uint) 的 图像数据到data[b]中
 		load_fm(data[b], config[0]);
+		// WHC -> CHW ，四张图片首尾拼接
 		img_DT_2_DT4(data[b], img, config[0], b);
 	}
 	//*************************************HLS, Skynet *********************************

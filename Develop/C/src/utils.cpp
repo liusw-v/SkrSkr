@@ -33,6 +33,7 @@ void check(DT* result, DT* golden, int len, layer l)
         printf("%s correct \n", l.name);
 }
 
+/* 根据l.name，加载feature map */
 void load_fm(ADT* fm, layer l)
 {
     char nstr[50];
